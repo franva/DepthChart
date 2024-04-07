@@ -25,7 +25,7 @@ namespace NFLPlayers.Controllers
             {
                 var player = ControllerHelper.CreatePlayer(request);
 
-                _depthChartService.AddPlayerToDepthChart(player.Position, player, player.DepthPosition);
+                _depthChartService.AddPlayerToDepthChart(player.Position, player, player.PositionDepth);
                 return Ok();
             }
             catch (Exception ex)

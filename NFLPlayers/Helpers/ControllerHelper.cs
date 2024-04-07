@@ -8,7 +8,7 @@ namespace NFLPlayers.Helpers
     {
         public class PlayerWithDepth : Player
         {
-            public int? DepthPosition { get; set; }
+            public int? PositionDepth { get; set; }
         }
 
         public static PlayerWithDepth CreatePlayer(JsonElement request)
@@ -30,7 +30,7 @@ namespace NFLPlayers.Helpers
                     Number = number,
                     Name = name,
                     Position = position,
-                    DepthPosition = positionDepth == int.MinValue ? null : positionDepth
+                    PositionDepth = positionDepth == int.MinValue ? null : positionDepth
                 };
             }
             catch (Exception ex)

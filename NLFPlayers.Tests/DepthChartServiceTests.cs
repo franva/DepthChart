@@ -43,6 +43,18 @@ namespace NLFPlayers.Tests
         }
 
         [Test]
+        public void AddPlayerToDepthChart_AddsSamePlayerToDifferentPosition()
+        {
+            var player = new Player { Number = 1, Name = "Test Player", Position = "QB" };
+            _service.AddPlayerToDepthChart("QB", player, 0);
+            _service.AddPlayerToDepthChart("RB", player, 0);
+
+            var depthChart = _service.GetFullDepthChart();
+            Assert.That(depthChart["QB"].Contains(player), Is.True);
+            Assert.That(depthChart["RB"].Contains(player), Is.True);
+        }
+
+        [Test]
         public void AddPlayerToDepthChart_ThrowsWhenDuplicateNumber()
         {
             var player1 = new Player { Number = 1, Name = "Test Player", Position = "QB" };

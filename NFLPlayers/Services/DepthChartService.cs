@@ -11,10 +11,22 @@ namespace NFLPlayers.Services
         {
             _depthCharts = new Dictionary<string, List<Player>>();
         }
-        
-        private bool PlayerNumberExists(int number)
+
+        public bool IsPlayerNumberUnique(int number, string position, string name)
         {
-            return _depthCharts.SelectMany(dc => dc.Value).Any(player => player.Number == number);
+            // if it's the same user but in different position, return true
+            if (_depthCharts.Any(dc => dc.Value.Any(player => player.Number == number && player.Name == name && player.Position != position)))
+            {
+                return true;
+            }
+
+            // if it's a different user but with same number regardless in which position, return false
+            if (_depthCharts.Any(dc => dc.Value.Any(player => player.Number == number && player.Name != name)))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private void ValidatePlayer(Player player)
@@ -23,14 +35,7 @@ namespace NFLPlayers.Services
             {
                 throw new ArgumentException("Player number must be a positive non-zero integer.");
             }
-
-            // Check for unique number
-            if (PlayerNumberExists(player.Number))
-            {
-                throw new InvalidOperationException($"A player with number {player.Number} already exists on the depth chart.");
-            }
-
-            // Check for non-empty name and position
+            
             if (string.IsNullOrWhiteSpace(player.Name))
             {
                 throw new ArgumentException("Player name cannot be null or whitespace.");
@@ -39,6 +44,11 @@ namespace NFLPlayers.Services
             if (string.IsNullOrWhiteSpace(player.Position))
             {
                 throw new ArgumentException("Player position cannot be null or whitespace.");
+            }
+
+            if (IsPlayerNumberUnique(player.Number, player.Position, player.Name) == false)
+            {
+                throw new InvalidOperationException($"A player with number {player.Number} already exists on the depth chart.");
             }
         }
 
