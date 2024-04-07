@@ -1,0 +1,35 @@
+# Ignore build output
+bin/
+obj/
+
+# Ignore NuGet packages
+*.nupkg
+packages/
+
+# Ignore Visual Studio files
+.vs/
+*.suo
+*.user
+*.sln.docstates
+
+# Ignore Resharper files
+_ReSharper*/
+
+# Ignore build artifacts
+*.dll
+*.exe
+*.pdb
+*.cache
+*.log
+*.vsix
+*.zip
+
+# Ignore test results
+TestResults/
+
+# Ignore publish profiles
+*.pubxml
+
+# Ignore local configuration files
+appsettings.json
+appsettings.Development.json
