@@ -93,7 +93,7 @@ namespace NFLPlayers.Services
             }
         }
 
-        public Player RemovePlayerFromDepthChart(string position, Player player)
+        public Player? RemovePlayerFromDepthChart(string position, Player player)
         {
             if (_depthCharts.ContainsKey(position) && _depthCharts[position].Remove(player))
             {

@@ -210,7 +210,7 @@ namespace NLFPlayers.Tests
             
             var removedPlayer = _service.RemovePlayerFromDepthChart("WR", MikeEvans);
             /* Output */
-            // #13 � MikeEvans
+            // #13 MikeEvans
             Assert.That(removedPlayer, Is.EqualTo(null));
 
             removedPlayer = _service.RemovePlayerFromDepthChart("LWR", MikeEvans);
