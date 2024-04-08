@@ -13,7 +13,6 @@ namespace NFLPlayers.Helpers
                 }
             }
 
-            //throw new KeyNotFoundException($"Property '{propertyName}' not found.");
             return string.Empty;
         }
 
@@ -27,13 +26,8 @@ namespace NFLPlayers.Helpers
                 }
             }
             
-            //throw new KeyNotFoundException($"Property '{propertyName}' not found.");
             return int.MinValue;
         
         }
     }
 }
-
-// Usage:
-// JsonElement element = ... // Your JsonElement
-// string name = GetPropertyCaseInsensitive(element, "name");  // This will work for "name", "Name", "NAME", etc.

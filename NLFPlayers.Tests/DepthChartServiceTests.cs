@@ -19,7 +19,7 @@ namespace NLFPlayers.Tests
         public void AddPlayerToDepthChart_AddsPlayerToEndIfNoPositionDepthGiven()
         {
             // Arrange
-            var player = new Player { Number = 1, Name = "Test Player", Position = "QB" };
+            var player = new Player { Number = 1, Name = "Test Player" };
 
             // Act
             _service.AddPlayerToDepthChart("QB", player, null);
@@ -35,7 +35,7 @@ namespace NLFPlayers.Tests
         [Test]
         public void AddPlayerToDepthChart_AddsPlayerCorrectly()
         {
-            var player = new Player { Number = 1, Name = "Test Player", Position = "QB" };
+            var player = new Player { Number = 1, Name = "Test Player" };
             _service.AddPlayerToDepthChart("QB", player, 0);
 
             var depthChart = _service.GetFullDepthChart();
@@ -45,7 +45,7 @@ namespace NLFPlayers.Tests
         [Test]
         public void AddPlayerToDepthChart_AddsSamePlayerToDifferentPosition()
         {
-            var player = new Player { Number = 1, Name = "Test Player", Position = "QB" };
+            var player = new Player { Number = 1, Name = "Test Player" };
             _service.AddPlayerToDepthChart("QB", player, 0);
             _service.AddPlayerToDepthChart("RB", player, 0);
 
@@ -57,27 +57,28 @@ namespace NLFPlayers.Tests
         [Test]
         public void AddPlayerToDepthChart_ThrowsWhenDuplicateNumber()
         {
-            var player1 = new Player { Number = 1, Name = "Test Player", Position = "QB" };
-            _service.AddPlayerToDepthChart("QB", player1, 0);
-            var player2 = new Player { Number = 1, Name = "Another Player", Position = "RB" };
+            var position = "QB";
+            var player1 = new Player { Number = 1, Name = "Test Player" };
+            _service.AddPlayerToDepthChart(position, player1, 0);
+            var player2 = new Player { Number = 1, Name = "Another Player" };
 
-            var ex = Assert.Throws<InvalidOperationException>(() => _service.AddPlayerToDepthChart("RB", player2, 0));
-            Assert.That(ex.Message, Is.EqualTo("A player with number 1 already exists on the depth chart."));
+            var ex = Assert.Throws<InvalidOperationException>(() => _service.AddPlayerToDepthChart(position, player2, 0));
+            Assert.That(ex.Message, Is.EqualTo($"A player with number 1 already exists in the {position} position."));
         }
 
         [Test]
         public void AddPlayerToDepthChart_ThrowsIfPositionDepthOutOfBounds()
         {
-            var player = new Player { Number = 3, Name = "Out Player", Position = "QB" };
+            var player = new Player { Number = 3, Name = "Out Player" };
             Assert.Throws<ArgumentOutOfRangeException>(() => _service.AddPlayerToDepthChart("QB", player, -1));
         }
 
         [Test]
         public void AddPlayerToDepthChart_InsertsPlayerInMiddle()
         {
-            var player1 = new Player { Number = 1, Name = "Player 1", Position = "QB" };
-            var player2 = new Player { Number = 2, Name = "Player 2", Position = "QB" };
-            var player3 = new Player { Number = 3, Name = "Player 3", Position = "QB" };
+            var player1 = new Player { Number = 1, Name = "Player 1" };
+            var player2 = new Player { Number = 2, Name = "Player 2" };
+            var player3 = new Player { Number = 3, Name = "Player 3" };
             _service.AddPlayerToDepthChart("QB", player1, 0);
             _service.AddPlayerToDepthChart("QB", player2, 1);
             _service.AddPlayerToDepthChart("QB", player3, 1);
@@ -91,7 +92,7 @@ namespace NLFPlayers.Tests
         [Test]
         public void RemovePlayerFromDepthChart_RemovesPlayerSuccessfully()
         {
-            var player = new Player { Number = 4, Name = "Remove Player", Position = "QB" };
+            var player = new Player { Number = 4, Name = "Remove Player" };
             _service.AddPlayerToDepthChart("QB", player, 0);
             var removedPlayer = _service.RemovePlayerFromDepthChart("QB", player);
 
@@ -102,7 +103,7 @@ namespace NLFPlayers.Tests
         [Test]
         public void RemovePlayerFromDepthChart_ReturnsNullIfPlayerNotFound()
         {
-            var player = new Player { Number = 5, Name = "Non-Existent", Position = "QB" };
+            var player = new Player { Number = 5, Name = "Non-Existent" };
             var result = _service.RemovePlayerFromDepthChart("QB", player);
 
             Assert.That(result, Is.Null);
@@ -112,8 +113,8 @@ namespace NLFPlayers.Tests
         [Test]
         public void GetBackups_ReturnsCorrectBackups()
         {
-            var player1 = new Player { Number = 6, Name = "Starter", Position = "QB" };
-            var player2 = new Player { Number = 7, Name = "Backup", Position = "QB" };
+            var player1 = new Player { Number = 6, Name = "Starter" };
+            var player2 = new Player { Number = 7, Name = "Backup" };
             _service.AddPlayerToDepthChart("QB", player1, 0);
             _service.AddPlayerToDepthChart("QB", player2, 1);
 
@@ -125,7 +126,7 @@ namespace NLFPlayers.Tests
         [Test]
         public void GetBackups_ReturnsEmptyIfNoBackups()
         {
-            var player = new Player { Number = 8, Name = "Lone Player", Position = "QB" };
+            var player = new Player { Number = 8, Name = "Lone Player" };
             _service.AddPlayerToDepthChart("QB", player, 0);
 
             var backups = _service.GetBackups("QB", player);
@@ -136,8 +137,8 @@ namespace NLFPlayers.Tests
         [Test]
         public void GetFullDepthChart_ReturnsCompleteDepthChart()
         {
-            var player1 = new Player { Number = 9, Name = "Player One", Position = "QB" };
-            var player2 = new Player { Number = 10, Name = "Player Two", Position = "RB" };
+            var player1 = new Player { Number = 9, Name = "Player One" };
+            var player2 = new Player { Number = 10, Name = "Player Two" };
             _service.AddPlayerToDepthChart("QB", player1, 0);
             _service.AddPlayerToDepthChart("RB", player2, 0);
 
@@ -150,12 +151,12 @@ namespace NLFPlayers.Tests
         [Test]
         public void Full_test()
         {
-            var TomBrady = new Player(12, "Tom Brady", "QB");
-            var BlaineGabbert = new Player(11, "Blaine Gabbert", "QB");
-            var KyleTrask = new Player(2, "Kyle Trask", "QB");
-            var MikeEvans = new Player(13, "Mike Evans", "LWR");
-            var JaelonDarden = new Player(1, "Jaelon Darden", "LWR");
-            var ScottMiller = new Player(10, "Scott Miller", "LWR");
+            var TomBrady = new Player(12, "Tom Brady");
+            var BlaineGabbert = new Player(11, "Blaine Gabbert");
+            var KyleTrask = new Player(2, "Kyle Trask");
+            var MikeEvans = new Player(13, "Mike Evans");
+            var JaelonDarden = new Player(1, "Jaelon Darden");
+            var ScottMiller = new Player(10, "Scott Miller");
             _service.AddPlayerToDepthChart("QB", TomBrady, 0);
             _service.AddPlayerToDepthChart("QB", BlaineGabbert, 1);
             _service.AddPlayerToDepthChart("QB", KyleTrask, 2);

@@ -1,8 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Routing;
 using NFLPlayers.Helpers;
 using NFLPlayers.Interfaces;
-using NFLPlayers.Models;
 using System.Text.Json;
 
 namespace NFLPlayers.Controllers
@@ -23,9 +21,9 @@ namespace NFLPlayers.Controllers
         {
             try
             {
-                var player = ControllerHelper.CreatePlayer(request);
+                var playerWithExtraInfo = ControllerHelper.CreatePlayer(request);
 
-                _depthChartService.AddPlayerToDepthChart(player.Position, player, player.PositionDepth);
+                _depthChartService.AddPlayerToDepthChart(playerWithExtraInfo.Position!, playerWithExtraInfo!.Player!, playerWithExtraInfo.PositionDepth);
                 return Ok();
             }
             catch (Exception ex)
@@ -40,8 +38,8 @@ namespace NFLPlayers.Controllers
         {
             try
             {
-                var player = ControllerHelper.CreatePlayer(request);
-                var removedPlayer = _depthChartService.RemovePlayerFromDepthChart(player.Position, player);
+                var playerWithExtraInfo = ControllerHelper.CreatePlayer(request);
+                var removedPlayer = _depthChartService.RemovePlayerFromDepthChart(playerWithExtraInfo.Position!, playerWithExtraInfo.Player!);
                 return removedPlayer != null ? Ok(removedPlayer) : NotFound();
             }
             catch (Exception ex)

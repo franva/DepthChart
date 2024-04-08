@@ -12,16 +12,10 @@ namespace NFLPlayers.Services
             _depthCharts = new Dictionary<string, List<Player>>();
         }
 
-        public bool IsPlayerNumberUnique(int number, string position, string name)
+        private bool ValidatePlayerInfo(Player player)
         {
-            // if it's the same user but in different position, return true
-            if (_depthCharts.Any(dc => dc.Value.Any(player => player.Number == number && player.Name == name && player.Position != position)))
-            {
-                return true;
-            }
-
-            // if it's a different user but with same number regardless in which position, return false
-            if (_depthCharts.Any(dc => dc.Value.Any(player => player.Number == number && player.Name != name)))
+            // this mehtod only checks the validity of number and name, if it's valid, return true, otherwise, return false
+            if (player.Number <= 0 || string.IsNullOrWhiteSpace(player.Name))
             {
                 return false;
             }
@@ -29,32 +23,14 @@ namespace NFLPlayers.Services
             return true;
         }
 
-        private void ValidatePlayer(Player player)
-        {
-            if (player.Number <= 0)
-            {
-                throw new ArgumentException("Player number must be a positive non-zero integer.");
-            }
-            
-            if (string.IsNullOrWhiteSpace(player.Name))
-            {
-                throw new ArgumentException("Player name cannot be null or whitespace.");
-            }
-
-            if (string.IsNullOrWhiteSpace(player.Position))
-            {
-                throw new ArgumentException("Player position cannot be null or whitespace.");
-            }
-
-            if (IsPlayerNumberUnique(player.Number, player.Position, player.Name) == false)
-            {
-                throw new InvalidOperationException($"A player with number {player.Number} already exists on the depth chart.");
-            }
-        }
-
         public void AddPlayerToDepthChart(string position, Player player, int? positionDepth = null)
         {
-            ValidatePlayer(player);
+            if (string.IsNullOrWhiteSpace(position))
+            {
+                throw new ArgumentException("Position cannot be null or whitespace.");
+            }
+
+            ValidatePlayerInfo(player);
 
             // Check the positionDepth is valid
             if (positionDepth.HasValue && positionDepth.Value < 0)
@@ -68,28 +44,30 @@ namespace NFLPlayers.Services
             }
 
             var playersAtPosition = _depthCharts[position];
-            if (positionDepth.HasValue && positionDepth.Value >= 0 && positionDepth.Value <= playersAtPosition.Count)
+
+            // Check if this exact player is already in this exact position
+            if (playersAtPosition.Any(p => p.Number == player.Number))
             {
-                // Check if the player already exists at this position depth
-                if (positionDepth.Value < playersAtPosition.Count && playersAtPosition[positionDepth.Value].Number == player.Number)
+                throw new InvalidOperationException($"A player with number {player.Number} already exists in the {position} position.");
+            }
+            
+            if(positionDepth.HasValue)
+            {
+                if (positionDepth.Value < 0)
                 {
-                    throw new InvalidOperationException($"A player with number {player.Number} is already at position depth {positionDepth.Value} in position {position}.");
+                    throw new ArgumentOutOfRangeException(nameof(positionDepth), "Position depth cannot be negative.");
                 }
 
-                playersAtPosition.Insert(positionDepth.Value, player);
-            }
-            else
-            {
-                if (positionDepth.HasValue && positionDepth.Value > playersAtPosition.Count)
+                if (positionDepth.Value > playersAtPosition.Count)
                 {
                     throw new ArgumentOutOfRangeException("Position depth is greater than the number of players at this position.");
                 }
 
-                // Ensure the player isn't already in the list for this position 
-                if (!playersAtPosition.Any(p => p.Number == player.Number))
-                {
-                    playersAtPosition.Add(player);
-                }
+                playersAtPosition.Insert(positionDepth.Value, player);
+            } 
+            else
+            {
+                playersAtPosition.Add(player);
             }
         }
 
@@ -126,13 +104,13 @@ namespace NFLPlayers.Services
             // Example players for seeding the depth chart
             var players = new List<(string position, Player player, int positionDepth)>()
             {
-                ("QB", new Player { Number = 12, Name = "Tom Brady", Position = "QB" }, 0),
-                ("QB", new Player { Number = 11, Name = "Blaine Gabbert", Position = "QB" }, 1),
-                ("QB", new Player { Number = 2, Name = "Kyle Trask", Position = "QB" }, 2),
-                ("WR", new Player { Number = 13, Name = "Mike Evans", Position = "WR" }, 0),
-                ("WR", new Player { Number = 14, Name = "Chris Godwin", Position = "WR" }, 1),
-                ("RB", new Player { Number = 7, Name = "Leonard Fournette", Position = "RB" }, 0),
-                ("RB", new Player { Number = 27, Name = "Ronald Jones II", Position = "RB" }, 1)
+                ("QB", new Player { Number = 12, Name = "Tom Brady" }, 0),
+                ("QB", new Player { Number = 11, Name = "Blaine Gabbert" }, 1),
+                ("QB", new Player { Number = 2, Name = "Kyle Trask" }, 2),
+                ("WR", new Player { Number = 13, Name = "Mike Evans" }, 0),
+                ("WR", new Player { Number = 14, Name = "Chris Godwin" }, 1),
+                ("RB", new Player { Number = 7, Name = "Leonard Fournette" }, 0),
+                ("RB", new Player { Number = 27, Name = "Ronald Jones II" }, 1)
             };
 
             foreach (var (position, player, positionDepth) in players)

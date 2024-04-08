@@ -1,51 +1,55 @@
-﻿using Newtonsoft.Json;
-
-namespace NFLPlayers.Models
+﻿namespace NFLPlayers.Models
 {
     public class Player
     {
-        [JsonProperty("number")]
         public int Number { get; set; }
         
-        [JsonProperty("name")]
         public string Name { get; set; }
-        
-        [JsonProperty("Position")]
-        public string? Position { get; set; }
 
         public Player()
         {
             Name = string.Empty;
-            Position = string.Empty;
         }
 
-        public Player(int number, string name, string? position)
+        public Player(int number, string name)
         {
             Number = number;
             Name = name;
-
-            if(position != null)
-            {
-                Position = position;
-            }
-            else
-            {
-                Position = string.Empty;
-            }
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj is Player other)
             {
-                return Number == other.Number && Name == other.Name && Position == other.Position;
+                return Number == other.Number && Name == other.Name;
             }
             return false;
         }
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Number, Name, Position);
+            return HashCode.Combine(Number, Name);
         }
+
+        public static List<string> CreatePositions(string positions)
+        {
+            var Positions = new List<string>();
+            if (positions.Contains(","))
+            {
+                foreach (var position in positions.Split(','))
+                {
+                    if (!string.IsNullOrEmpty(position.Trim()))
+                    {
+                        Positions.Add(position.Trim());
+                    }
+                }                
+            }
+            else
+            {
+                Positions.Add(positions.Trim());
+            }
+            return Positions;
+        }
+
     }
 }

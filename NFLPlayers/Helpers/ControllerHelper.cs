@@ -1,17 +1,18 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
-using NFLPlayers.Models;
+﻿using NFLPlayers.Models;
 using System.Text.Json;
 
 namespace NFLPlayers.Helpers
 {
     public static class ControllerHelper
     {
-        public class PlayerWithDepth : Player
+        public class PlayerWithPositionDepth
         {
+            public Player? Player { get; set; }
+            public string? Position { get; set; }
             public int? PositionDepth { get; set; }
         }
 
-        public static PlayerWithDepth CreatePlayer(JsonElement request)
+        public static PlayerWithPositionDepth CreatePlayer(JsonElement request)
         {
             try
             {
@@ -25,13 +26,15 @@ namespace NFLPlayers.Helpers
                     throw new InvalidOperationException("Player data is incomplete.");
                 }
 
-                return new PlayerWithDepth
+                var player = new Player(number, name);
+                var playerWithDepth = new PlayerWithPositionDepth
                 {
-                    Number = number,
-                    Name = name,
+                    Player = player,
                     Position = position,
-                    PositionDepth = positionDepth == int.MinValue ? null : positionDepth
+                    PositionDepth = positionDepth
                 };
+                
+                return playerWithDepth;
             }
             catch (Exception ex)
             {

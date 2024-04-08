@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using NFLPlayers.Controllers;
 using NFLPlayers.Interfaces;
 using NFLPlayers.Models;
@@ -24,16 +25,17 @@ namespace NLFPlayers.Tests
         public void AddPlayerToDepthChart_ReturnsOk_WhenPlayerIsAdded()
         {
             // Arrange
-            var player = new Player { Number = 12, Name = "Tom Brady", Position = "QB" };
-            var playerJson = JsonSerializer.Serialize(player); // Convert player object to JSON element
+            var playerJson = JsonDocument.Parse("{\"number\": 12, \"name\": \"Tom Brady\", \"position\": \"QB\"}").RootElement;
+            var player = JsonConvert.DeserializeObject<Player>(playerJson.ToString());
 
             // Act
-            var result = _controller.AddPlayerToDepthChart(JsonDocument.Parse(playerJson).RootElement) as OkResult; // Pass JSON element to the method
+            var result = _controller.AddPlayerToDepthChart(playerJson) as OkResult; // Pass JSON element to the method
 
             // Assert
             Assert.That(result, Is.Not.Null);
             Assert.That(result.StatusCode, Is.EqualTo(200));
-            _depthChartService.Received().AddPlayerToDepthChart(Arg.Is("QB"), Arg.Is(player), Arg.Any<int?>());
+
+            _depthChartService.Received().AddPlayerToDepthChart(Arg.Is("QB"), Arg.Is(player)!, Arg.Any<int?>());
         }
 
 
@@ -47,7 +49,7 @@ namespace NLFPlayers.Tests
             var result = _controller.AddPlayerToDepthChart(playerJson) as BadRequestObjectResult;
 
             // Assert
-            Assert.That(result.StatusCode, Is.EqualTo(400));
+            Assert.That(result!.StatusCode, Is.EqualTo(400));
         }
 
         [Test]
@@ -63,8 +65,60 @@ namespace NLFPlayers.Tests
             var result = _controller.AddPlayerToDepthChart(playerJson) as BadRequestObjectResult;
 
             // Assert
-            Assert.That(result.StatusCode, Is.EqualTo(400));
+            Assert.That(result!.StatusCode, Is.EqualTo(400));
             Assert.That(result.Value, Is.EqualTo("Duplicate player number."));
+        }
+
+        // unit test for adding the same player to a different position
+        [Test]
+        public void AddPlayerToDepthChart_ReturnsOk_WhenPlayerIsAddedToDifferentPosition()
+        {
+            // Arrange 1
+            var tempDict = new Dictionary<string, List<Player>>();
+
+            _depthChartService.When(x => x.AddPlayerToDepthChart(Arg.Any<string>(), Arg.Any<Player>(), Arg.Any<int?>()))
+                              .Do(x => 
+                              {
+                                  var position = x.Arg<string>();
+                                  if (!tempDict.ContainsKey(position))
+                                  {
+                                      tempDict[position] = new List<Player>();
+                                  }
+
+                                  tempDict[position].Add(x.Arg<Player>());
+                              } );
+
+            _depthChartService.GetFullDepthChart().Returns(tempDict);
+
+            var playerJson = JsonDocument.Parse("{\"number\": 12, \"name\": \"Tom Brady\", \"position\": \"QB\"}").RootElement;
+            var player = JsonConvert.DeserializeObject<Player>(playerJson.ToString());
+
+
+            // Act 1
+            var result = _controller.AddPlayerToDepthChart(playerJson) as OkResult;
+            
+            // Assert 1
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.StatusCode, Is.EqualTo(200));
+            _depthChartService.Received().AddPlayerToDepthChart(Arg.Any<string>(), Arg.Any<Player>(), Arg.Any<int?>());
+            Assert.That(_depthChartService.GetFullDepthChart()["QB"].Contains(player!));
+
+
+            // Arrange 2
+            playerJson = JsonDocument.Parse("{\"number\": 12, \"name\": \"Tom Brady\", \"position\": \"RB\"}").RootElement;
+            player = JsonConvert.DeserializeObject<Player>(playerJson.ToString());
+
+
+            // Act 2
+            result = _controller.AddPlayerToDepthChart(playerJson) as OkResult;
+            
+            // Assert 2
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.StatusCode, Is.EqualTo(200));
+            _depthChartService.Received().AddPlayerToDepthChart(Arg.Any<string>(), Arg.Any<Player>(), Arg.Any<int?>());
+            // check if the player was added to the new position
+            Assert.That(_depthChartService.GetFullDepthChart()["RB"].Contains(player!));
+            _depthChartService.Received().AddPlayerToDepthChart(Arg.Is("RB"), Arg.Is(player)!, Arg.Any<int?>());
         }
 
         // -----------------------RemovePlayerFromDepthChart Tests-----------------------
@@ -73,7 +127,7 @@ namespace NLFPlayers.Tests
         {
             // Arrange
             var playerJson = JsonDocument.Parse("{\"number\": 12, \"name\": \"Tom Brady\", \"position\": \"QB\"}").RootElement;
-            var playerToRemove = new Player { Number = 12, Name = "Tom Brady", Position = "QB" };
+            var playerToRemove = new Player { Number = 12, Name = "Tom Brady" };
             _depthChartService.RemovePlayerFromDepthChart(Arg.Any<string>(), Arg.Any<Player>()).Returns(playerToRemove);
 
             // Act
@@ -91,7 +145,7 @@ namespace NLFPlayers.Tests
         {
             // Arrange
             var playerJson = JsonDocument.Parse("{\"number\": 99, \"name\": \"Non Existent Player\", \"position\": \"QB\"}").RootElement;
-            _depthChartService.RemovePlayerFromDepthChart(Arg.Any<string>(), Arg.Any<Player>()).Returns((Player)null);
+            _depthChartService.RemovePlayerFromDepthChart(Arg.Any<string>(), Arg.Any<Player>()).Returns(null as Player);
 
             // Act
             var result = _controller.RemovePlayerFromDepthChart(playerJson) as NotFoundResult;
@@ -122,7 +176,7 @@ namespace NLFPlayers.Tests
         {
             // Arrange
             var playerJson = JsonDocument.Parse("{\"number\": 100, \"name\": \"Ghost Player\", \"position\": \"QB\"}").RootElement;
-            _depthChartService.RemovePlayerFromDepthChart(Arg.Any<string>(), Arg.Is<Player>(p => p.Number == 100)).Returns((Player)null);
+            _depthChartService.RemovePlayerFromDepthChart(Arg.Any<string>(), Arg.Is<Player>(p => p.Number == 100)).Returns(null as Player);
 
             // Act
             var result = _controller.RemovePlayerFromDepthChart(playerJson) as NotFoundResult;
@@ -199,7 +253,7 @@ namespace NLFPlayers.Tests
             var result = _controller.GetBackups(position, playerNumber) as NotFoundResult;
 
             // Assert
-            Assert.That(result.StatusCode, Is.EqualTo(404));
+            Assert.That(result!.StatusCode, Is.EqualTo(404));
         }
 
         // --------------------- GetFullDepthChart Tests -------------------
@@ -211,13 +265,13 @@ namespace NLFPlayers.Tests
             {
                 ["QB"] = new List<Player>
             {
-                new Player { Number = 12, Name = "Tom Brady", Position = "QB" },
-                new Player { Number = 11, Name = "Blaine Gabbert", Position = "QB" }
+                new Player { Number = 12, Name = "Tom Brady" },
+                new Player { Number = 11, Name = "Blaine Gabbert" }
             },
                 ["RB"] = new List<Player>
             {
-                new Player { Number = 28, Name = "Leonard Fournette", Position = "RB" },
-                new Player { Number = 27, Name = "Ronald Jones", Position = "RB" }
+                new Player { Number = 28, Name = "Leonard Fournette" },
+                new Player { Number = 27, Name = "Ronald Jones" }
             }
             };
 
@@ -267,9 +321,9 @@ namespace NLFPlayers.Tests
 
         private List<Player> PrepareData()
         {
-            var mainPlayer = new Player { Number = 666, Name = "Main Player", Position = "QB" };
-            var gabbert = new Player { Number = 11, Name = "Gabbert, Blaine", Position = "QB" };
-            var kyle = new Player { Number = 2, Name = "Trask, Kyle", Position = "QB" };
+            var mainPlayer = new Player { Number = 666, Name = "Main Player" };
+            var gabbert = new Player { Number = 11, Name = "Gabbert, Blaine" };
+            var kyle = new Player { Number = 2, Name = "Trask, Kyle" };
 
             var fullDepthChart = new List<Player>
                         {
