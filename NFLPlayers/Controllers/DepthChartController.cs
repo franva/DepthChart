@@ -27,7 +27,11 @@ namespace NFLPlayers.Controllers
             {
                 var playerWithExtraInfo = ControllerHelper.CreatePlayer(request);
 
-                _depthChartService.AddPlayerToDepthChart(playerWithExtraInfo.Player.SportId, playerWithExtraInfo.Player.TeamId, playerWithExtraInfo.Position!, playerWithExtraInfo!.Player!, playerWithExtraInfo.PositionDepth);
+                _depthChartService.AddPlayerToDepthChart(playerWithExtraInfo.Player.SportId, playerWithExtraInfo.Player.TeamId, 
+                                                        playerWithExtraInfo.Position!, playerWithExtraInfo!.Player!, playerWithExtraInfo.PositionDepth);
+                
+                _cache.Remove($"Backups-{playerWithExtraInfo.Player.SportId}-{playerWithExtraInfo.Player.TeamId}-{playerWithExtraInfo.Position}".ToLowerInvariant());
+                _cache.Remove($"fullDepthChart_{playerWithExtraInfo.Player.SportId}_{playerWithExtraInfo.Player.TeamId}".ToLowerInvariant());
                 return Ok();
             }
             catch(InvalidOperationException ex)
@@ -51,7 +55,12 @@ namespace NFLPlayers.Controllers
                 if (player != null)
                 {
                     var removedPlayer = _depthChartService.RemovePlayerFromDepthChart(request.SportId, request.TeamId, request.Position!, player!);
-                    return removedPlayer != null ? Ok(removedPlayer) : NotFound();
+                    if(removedPlayer != null)
+                    {
+                        _cache.Remove($"Backups-{request.SportId}-{request.TeamId}-{request.Position}".ToLowerInvariant());
+                        _cache.Remove($"fullDepthChart_{request.SportId}_{request.TeamId}".ToLowerInvariant());
+                        return Ok(removedPlayer);
+                    }
                 }
 
                 return NotFound();
@@ -68,7 +77,7 @@ namespace NFLPlayers.Controllers
         {
             try
             {
-                var cacheKey = $"Backups-{sportId}-{teamId}-{position}";
+                var cacheKey = $"Backups-{sportId}-{teamId}-{position}".ToLowerInvariant();
                 if(!_cache.TryGetValue(cacheKey, out List<Player> backups))
                 {
                     var fullDepthChart = _depthChartService.GetFullDepthChart(sportId, teamId);
@@ -102,7 +111,7 @@ namespace NFLPlayers.Controllers
         {
             try
             {
-                var cacheKey = $"fullDepthChart_{sportId}_{teamId}";
+                var cacheKey = $"fullDepthChart_{sportId}_{teamId}".ToLowerInvariant();
 
                 if (!_cache.TryGetValue(cacheKey, out Dictionary<string, List<Player>> fullDepthChart))
                 {
