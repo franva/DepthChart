@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using NFLPlayers.Controllers;
 using NFLPlayers.Interfaces;
 using NFLPlayers.Models;
@@ -11,12 +12,20 @@ namespace NLFPlayers.Tests
     {
         private DepthChartController _controller;
         private IDepthChartService _depthChartService;
+        private IMemoryCache _cache;
 
         [SetUp]
         public void SetUp()
         {
             _depthChartService = Substitute.For<IDepthChartService>();
-            _controller = new DepthChartController(_depthChartService);
+            _cache = Substitute.For<IMemoryCache>();
+            _controller = new DepthChartController(_depthChartService, _cache);
+        }
+
+        [OneTimeTearDown]
+        public void OneTimeTearDown()
+        {
+            _cache.Dispose();
         }
 
         [Test]
@@ -274,6 +283,31 @@ namespace NLFPlayers.Tests
             tempDict.Add((1, 1, "QB"), new List<Player> { mainPlayer, gabbert, kyle });
 
             return tempDict;
+        }
+
+        [Test]
+        public void GetBackups_ReturnsDataFromCache_WhenDataIsCached()
+        {
+            // Arrange
+            var sportId = 1;
+            var teamId = 1;
+            var position = "QB";
+            var playerNumber = 0;
+            var cacheKey = $"Backups-{sportId}-{teamId}-{position}-{playerNumber}";
+            var cachedData = new List<Player> { new Player { Number = 10, Name = "Cached Player", TeamId = teamId, SportId = sportId } };
+            _cache.TryGetValue(cacheKey, out _).ReturnsForAnyArgs(x =>
+            {
+                x[1] = cachedData;
+                return true;
+            });
+
+            // Act
+            var result = _controller.GetBackups(sportId, teamId, position, playerNumber) as OkObjectResult;
+
+            // Assert
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.StatusCode, Is.EqualTo(200));
+            Assert.That(result.Value, Is.EqualTo(cachedData));
         }
 
     }

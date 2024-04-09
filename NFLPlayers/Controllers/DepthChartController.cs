@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using NFLPlayers.Helpers;
 using NFLPlayers.Interfaces;
-using System.Text.Json;
+using NFLPlayers.Models;
+using System.Collections.Generic;
 
 namespace NFLPlayers.Controllers
 {
@@ -10,10 +12,12 @@ namespace NFLPlayers.Controllers
     public class DepthChartController : ControllerBase
     {
         private readonly IDepthChartService _depthChartService;
+        private readonly IMemoryCache _cache;
 
-        public DepthChartController(IDepthChartService depthChartService)
+        public DepthChartController(IDepthChartService depthChartService, IMemoryCache cache)
         {
             _depthChartService = depthChartService;
+            _cache = cache;
         }
 
         [HttpPost("addPlayer")]
@@ -60,23 +64,30 @@ namespace NFLPlayers.Controllers
         }
 
         [HttpGet("{sportId:int}/{teamId:int}/getBackups/{position}/{playerNumber:int}")]
-        public IActionResult GetBackups(int sportId, int teamId, string position, [FromQuery] int playerNumber)
+        public IActionResult GetBackups(int sportId, int teamId, string position, int playerNumber)
         {
             try
             {
-                var fullDepthChart = _depthChartService.GetFullDepthChart(sportId, teamId);
-                if (fullDepthChart == null || !fullDepthChart.ContainsKey(position) || fullDepthChart[position].Count == 0)
+                var cacheKey = $"Backups-{sportId}-{teamId}-{position}";
+                if(!_cache.TryGetValue(cacheKey, out List<Player> backups))
                 {
-                    return NotFound();
+                    var fullDepthChart = _depthChartService.GetFullDepthChart(sportId, teamId);
+                    if (fullDepthChart == null || !fullDepthChart.ContainsKey(position) || fullDepthChart[position].Count == 0)
+                    {
+                        return NotFound();
+                    }
+
+                    var player = fullDepthChart[position].FirstOrDefault(p => p.Number == playerNumber);
+                    if (player == null)
+                    {
+                        return NotFound();
+                    }
+
+                    backups = _depthChartService.GetBackups(sportId, teamId, position, player);
+                    var cacheEntryOptions = new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromMinutes(5));
+                    _cache.Set(cacheKey, backups, cacheEntryOptions);
                 }
 
-                var player = fullDepthChart[position].FirstOrDefault(p => p.Number == playerNumber);
-                if (player == null)
-                {
-                    return NotFound();
-                }
-
-                var backups = _depthChartService.GetBackups(sportId, teamId, position, player);
                 return Ok(backups);
             }
             catch (Exception ex)
@@ -91,7 +102,15 @@ namespace NFLPlayers.Controllers
         {
             try
             {
-                var fullDepthChart = _depthChartService.GetFullDepthChart(sportId, teamId);
+                var cacheKey = $"fullDepthChart_{sportId}_{teamId}";
+
+                if (!_cache.TryGetValue(cacheKey, out Dictionary<string, List<Player>> fullDepthChart))
+                {
+                    fullDepthChart = _depthChartService.GetFullDepthChart(sportId, teamId);
+                    var cacheEntryOptions = new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromMinutes(5));
+                    _cache.Set(cacheKey, fullDepthChart, cacheEntryOptions);
+                }
+
                 return Ok(fullDepthChart);
             }
             catch (Exception ex)
