@@ -6,50 +6,36 @@
         
         public string Name { get; set; }
 
+        // The team id could also be a UUID type for production
+        public int TeamId { get; set; }
+
+        public int SportId { get; set; }
+
         public Player()
         {
             Name = string.Empty;
         }
 
-        public Player(int number, string name)
+        public Player(int number, string name, int teamId, int sportId)
         {
             Number = number;
             Name = name;
+            TeamId = teamId;
+            SportId = sportId;
         }
-
+        
         public override bool Equals(object? obj)
         {
             if (obj is Player other)
             {
-                return Number == other.Number && Name == other.Name;
+                return Number == other.Number && Name == other.Name && TeamId == other.TeamId && SportId == other.SportId;
             }
             return false;
         }
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Number, Name);
+            return HashCode.Combine(Number, Name, TeamId, SportId);
         }
-
-        public static List<string> CreatePositions(string positions)
-        {
-            var Positions = new List<string>();
-            if (positions.Contains(","))
-            {
-                foreach (var position in positions.Split(','))
-                {
-                    if (!string.IsNullOrEmpty(position.Trim()))
-                    {
-                        Positions.Add(position.Trim());
-                    }
-                }                
-            }
-            else
-            {
-                Positions.Add(positions.Trim());
-            }
-            return Positions;
-        }
-
     }
 }

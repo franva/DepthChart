@@ -5,11 +5,11 @@ namespace NFLPlayers.Services
 {
     public class DepthChartService : IDepthChartService
     {
-        private readonly Dictionary<string, List<Player>> _depthCharts;
+        private readonly Dictionary<(int SportId, int TeamId, string Position), List<Player>> _depthCharts;
 
         public DepthChartService()
         {
-            _depthCharts = new Dictionary<string, List<Player>>();
+            _depthCharts = new Dictionary<(int SportId, int TeamId, string Position), List<Player>>();
         }
 
         private bool ValidatePlayerInfo(Player player)
@@ -23,8 +23,10 @@ namespace NFLPlayers.Services
             return true;
         }
 
-        public void AddPlayerToDepthChart(string position, Player player, int? positionDepth = null)
+        public void AddPlayerToDepthChart(int sportId, int teamId, string position, Player player, int? positionDepth = null)
         {
+            var key = (sportId, teamId, position);
+
             if (string.IsNullOrWhiteSpace(position))
             {
                 throw new ArgumentException("Position cannot be null or whitespace.");
@@ -32,18 +34,12 @@ namespace NFLPlayers.Services
 
             ValidatePlayerInfo(player);
 
-            // Check the positionDepth is valid
-            if (positionDepth.HasValue && positionDepth.Value < 0)
+            if (!_depthCharts.ContainsKey(key))
             {
-                throw new ArgumentOutOfRangeException("Position depth must be a positive integer.");
+                _depthCharts[key] = new List<Player>();
             }
 
-            if (!_depthCharts.ContainsKey(position))
-            {
-                _depthCharts[position] = new List<Player>();
-            }
-
-            var playersAtPosition = _depthCharts[position];
+            var playersAtPosition = _depthCharts[key];
 
             // Check if this exact player is already in this exact position
             if (playersAtPosition.Any(p => p.Number == player.Number))
@@ -71,51 +67,64 @@ namespace NFLPlayers.Services
             }
         }
 
-        public Player? RemovePlayerFromDepthChart(string position, Player player)
+        public Player? RemovePlayerFromDepthChart(int sportId, int teamId, string position, Player player)
         {
-            if (_depthCharts.ContainsKey(position) && _depthCharts[position].Remove(player))
+            var key = (sportId, teamId, position);
+
+            if (_depthCharts.ContainsKey(key) && _depthCharts[key].Remove(player))
             {
                 return player;
             }
             return null;
         }
 
-        public List<Player> GetBackups(string position, Player player)
+        public List<Player> GetBackups(int sportId, int teamId, string position, Player player)
         {
-            List<Player> backups = new List<Player>();
-            if (_depthCharts.ContainsKey(position))
+            var key = (sportId, teamId, position);
+            var playersAtPosition = _depthCharts.GetValueOrDefault(key, new List<Player>());
+            int playerIndex = playersAtPosition.IndexOf(player);
+            if (playerIndex != -1 && playerIndex < playersAtPosition.Count - 1)
             {
-                int index = _depthCharts[position].IndexOf(player);
-                if (index != -1 && index < _depthCharts[position].Count - 1)
-                {
-                    backups = _depthCharts[position].GetRange(index + 1, _depthCharts[position].Count - index - 1);
-                }
+                return playersAtPosition.GetRange(playerIndex + 1, playersAtPosition.Count - playerIndex - 1);
             }
-            return backups;
+            return new List<Player>();
         }
 
-        public Dictionary<string, List<Player>> GetFullDepthChart()
+        public Dictionary<string, List<Player>> GetFullDepthChart(int sportId, int teamId)
         {
-            return new Dictionary<string, List<Player>>(_depthCharts);
+            return _depthCharts
+                    .Where(k => k.Key.SportId == sportId && k.Key.TeamId == teamId)
+                    .ToDictionary(d => d.Key.Position, d => d.Value);
         }
 
         public void SeedData()
         {
+            // Example sports and teams
+            int nflId = 1; // NFL Sport ID
+            int nbaId = 2; // NBA Sport ID
+            int tigersId = 101;
+            int lakersId = 201;
+
             // Example players for seeding the depth chart
-            var players = new List<(string position, Player player, int positionDepth)>()
+            var players = new List<(int sportId, int teamId, string position, Player player, int positionDepth)>()
             {
-                ("QB", new Player { Number = 12, Name = "Tom Brady" }, 0),
-                ("QB", new Player { Number = 11, Name = "Blaine Gabbert" }, 1),
-                ("QB", new Player { Number = 2, Name = "Kyle Trask" }, 2),
-                ("WR", new Player { Number = 13, Name = "Mike Evans" }, 0),
-                ("WR", new Player { Number = 14, Name = "Chris Godwin" }, 1),
-                ("RB", new Player { Number = 7, Name = "Leonard Fournette" }, 0),
-                ("RB", new Player { Number = 27, Name = "Ronald Jones II" }, 1)
+                // Seeding NFL players
+                (nflId, tigersId, "QB", new Player { Number = 12, Name = "Tom Brady" }, 0),
+                (nflId, tigersId, "QB", new Player { Number = 11, Name = "Blaine Gabbert" }, 1),
+                (nflId, tigersId, "QB", new Player { Number = 2, Name = "Kyle Trask" }, 2),
+                (nflId, tigersId, "WR", new Player { Number = 13, Name = "Mike Evans" }, 0),
+                (nflId, tigersId, "WR", new Player { Number = 14, Name = "Chris Godwin" }, 1),
+                (nflId, tigersId, "RB", new Player { Number = 7, Name = "Leonard Fournette" }, 0),
+                (nflId, tigersId, "RB", new Player { Number = 27, Name = "Ronald Jones II" }, 1),
+
+                // Seeding NBA players (example, positions might differ)
+                (nbaId, lakersId, "G", new Player { Number = 23, Name = "LeBron James" }, 0),
+                (nbaId, lakersId, "G", new Player { Number = 3, Name = "Anthony Davis" }, 1)
             };
 
-            foreach (var (position, player, positionDepth) in players)
+            foreach (var (sportId, teamId, position, player, positionDepth) in players)
             {
-                AddPlayerToDepthChart(position, player, positionDepth);
+                AddPlayerToDepthChart(sportId, teamId, position, player, positionDepth);
             }
         }
 

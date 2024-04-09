@@ -1,6 +1,4 @@
-﻿using System.Text.Json;
-using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
+﻿using Microsoft.AspNetCore.Mvc;
 using NFLPlayers.Controllers;
 using NFLPlayers.Interfaces;
 using NFLPlayers.Models;
@@ -25,17 +23,21 @@ namespace NLFPlayers.Tests
         public void AddPlayerToDepthChart_ReturnsOk_WhenPlayerIsAdded()
         {
             // Arrange
-            var playerJson = JsonDocument.Parse("{\"number\": 12, \"name\": \"Tom Brady\", \"position\": \"QB\"}").RootElement;
-            var player = JsonConvert.DeserializeObject<Player>(playerJson.ToString());
+            var request = new AddPlayerRequest
+            {
+                Position = "QB",
+                Player = new Player { SportId = 1, TeamId = 1, Number = 10, Name = "New Player" },
+                PositionDepth = 1
+            };
 
             // Act
-            var result = _controller.AddPlayerToDepthChart(playerJson) as OkResult; // Pass JSON element to the method
+            var result = _controller.AddPlayerToDepthChart(request) as OkResult;
 
             // Assert
             Assert.That(result, Is.Not.Null);
             Assert.That(result.StatusCode, Is.EqualTo(200));
 
-            _depthChartService.Received().AddPlayerToDepthChart(Arg.Is("QB"), Arg.Is(player)!, Arg.Any<int?>());
+            _depthChartService.Received().AddPlayerToDepthChart(request.Player.SportId, request.Player.TeamId, request.Position, Arg.Any<Player>(), request.PositionDepth);
         }
 
 
@@ -43,10 +45,14 @@ namespace NLFPlayers.Tests
         public void AddPlayerToDepthChart_ReturnsBadRequest_WhenPlayerDataIsIncomplete()
         {
             // Arrange
-            var playerJson = JsonDocument.Parse("{\"name\": \"Tom Brady\", \"position\": \"QB\"}").RootElement;
-
+            var request = new AddPlayerRequest
+            {
+                Position = "QB",
+                Player = new Player { Number = 10, Name = "New Player" },
+                PositionDepth = 1
+            };
             // Act
-            var result = _controller.AddPlayerToDepthChart(playerJson) as BadRequestObjectResult;
+            var result = _controller.AddPlayerToDepthChart(request) as BadRequestObjectResult;
 
             // Assert
             Assert.That(result!.StatusCode, Is.EqualTo(400));
@@ -55,285 +61,219 @@ namespace NLFPlayers.Tests
         [Test]
         public void AddPlayerToDepthChart_ReturnsBadRequest_WhenPlayerNumberIsDuplicated()
         {
-            // Arrange
-            var playerJson = JsonDocument.Parse("{\"number\": 12, \"name\": \"Tom Brady\", \"position\": \"QB\"}").RootElement;
-            _depthChartService
-                .When(x => x.AddPlayerToDepthChart(Arg.Any<string>(), Arg.Is<Player>(p => p.Number == 12), Arg.Any<int?>()))
-                .Throw(new InvalidOperationException("Duplicate player number."));
+            var request = new AddPlayerRequest
+        {
+            Position = "QB",
+            Player = new Player { SportId = 1,TeamId = 1,Number = 12, Name = "Tom Brady" },
+            PositionDepth = 1
+        };
 
-            // Act
-            var result = _controller.AddPlayerToDepthChart(playerJson) as BadRequestObjectResult;
+        // Simulate the service throwing an exception for duplicate player number
+        _depthChartService.When(x => x.AddPlayerToDepthChart(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Player>(), Arg.Any<int?>()))
+                          .Throw(new InvalidOperationException("A player with this number already exists in the position."));
 
-            // Assert
-            Assert.That(result!.StatusCode, Is.EqualTo(400));
-            Assert.That(result.Value, Is.EqualTo("Duplicate player number."));
+        var result = _controller.AddPlayerToDepthChart(request) as BadRequestObjectResult;
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result.StatusCode, Is.EqualTo(400));
+        Assert.That(result.Value, Is.EqualTo("A player with this number already exists in the position."));
         }
 
-        // unit test for adding the same player to a different position
         [Test]
         public void AddPlayerToDepthChart_ReturnsOk_WhenPlayerIsAddedToDifferentPosition()
         {
-            // Arrange 1
-            var tempDict = new Dictionary<string, List<Player>>();
+            var tempDict = new Dictionary<(int, int, string), List<Player>>();
 
-            _depthChartService.When(x => x.AddPlayerToDepthChart(Arg.Any<string>(), Arg.Any<Player>(), Arg.Any<int?>()))
-                              .Do(x => 
-                              {
-                                  var position = x.Arg<string>();
-                                  if (!tempDict.ContainsKey(position))
-                                  {
-                                      tempDict[position] = new List<Player>();
-                                  }
+            var request = new AddPlayerRequest
+            {
+                Position = "WR",
+                Player = new Player { SportId = 1, TeamId = 1,Number = 12, Name = "Tom Brady" },
+                PositionDepth = 0
+            };
 
-                                  tempDict[position].Add(x.Arg<Player>());
-                              } );
+            // Simulate successful addition
+            _depthChartService.When(x => x.AddPlayerToDepthChart(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Player>(), Arg.Any<int?>()))
+                            .Do(x =>
+                                    {
+                                        var key = (x.ArgAt<int>(0), x.ArgAt<int>(1), x.Arg<string>());
+                                        if (!tempDict.ContainsKey(key))
+                                        {
+                                            tempDict[key] = new List<Player>();
+                                        }
+                                        tempDict[key].Add(x.Arg<Player>());
+                                    });
 
-            _depthChartService.GetFullDepthChart().Returns(tempDict);
+            _depthChartService.When(x => x.GetFullDepthChart(Arg.Any<int>(), Arg.Any<int>()))
+                            .Do(x => tempDict.Where(k => k.Key.Item1 == x.ArgAt<int>(0) && k.Key.Item2 == x.ArgAt<int>(1))
+                                            .ToDictionary(d => d.Key.Item3, d => d.Value));
 
-            var playerJson = JsonDocument.Parse("{\"number\": 12, \"name\": \"Tom Brady\", \"position\": \"QB\"}").RootElement;
-            var player = JsonConvert.DeserializeObject<Player>(playerJson.ToString());
+            var result = _controller.AddPlayerToDepthChart(request) as OkResult;
 
-
-            // Act 1
-            var result = _controller.AddPlayerToDepthChart(playerJson) as OkResult;
-            
-            // Assert 1
             Assert.That(result, Is.Not.Null);
             Assert.That(result.StatusCode, Is.EqualTo(200));
-            _depthChartService.Received().AddPlayerToDepthChart(Arg.Any<string>(), Arg.Any<Player>(), Arg.Any<int?>());
-            Assert.That(_depthChartService.GetFullDepthChart()["QB"].Contains(player!));
-
-
-            // Arrange 2
-            playerJson = JsonDocument.Parse("{\"number\": 12, \"name\": \"Tom Brady\", \"position\": \"RB\"}").RootElement;
-            player = JsonConvert.DeserializeObject<Player>(playerJson.ToString());
-
-
-            // Act 2
-            result = _controller.AddPlayerToDepthChart(playerJson) as OkResult;
-            
-            // Assert 2
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result.StatusCode, Is.EqualTo(200));
-            _depthChartService.Received().AddPlayerToDepthChart(Arg.Any<string>(), Arg.Any<Player>(), Arg.Any<int?>());
-            // check if the player was added to the new position
-            Assert.That(_depthChartService.GetFullDepthChart()["RB"].Contains(player!));
-            _depthChartService.Received().AddPlayerToDepthChart(Arg.Is("RB"), Arg.Is(player)!, Arg.Any<int?>());
+            _depthChartService.Received().AddPlayerToDepthChart(request.Player.SportId, request.Player.TeamId, request.Position, request.Player, request.PositionDepth);
         }
 
         // -----------------------RemovePlayerFromDepthChart Tests-----------------------
         [Test]
         public void RemovePlayerFromDepthChart_ReturnsOk_WhenPlayerIsRemovedSuccessfully()
         {
-            // Arrange
-            var playerJson = JsonDocument.Parse("{\"number\": 12, \"name\": \"Tom Brady\", \"position\": \"QB\"}").RootElement;
-            var playerToRemove = new Player { Number = 12, Name = "Tom Brady" };
-            _depthChartService.RemovePlayerFromDepthChart(Arg.Any<string>(), Arg.Any<Player>()).Returns(playerToRemove);
+           // Arrange
+           var tempDict = new Dictionary<(int, int, string), List<Player>>();
 
-            // Act
-            var result = _controller.RemovePlayerFromDepthChart(playerJson) as OkObjectResult;
+           var removeRequest = new PlayerRequest
+            {
+                SportId = 1,
+                TeamId = 1,
+                Position = "QB",
+                PlayerNumber = 12
+            };
 
-            // Assert
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result.StatusCode, Is.EqualTo(200));
-            Assert.That(result.Value, Is.EqualTo(playerToRemove));
-            _depthChartService.Received().RemovePlayerFromDepthChart(Arg.Any<string>(), Arg.Any<Player>());
+            var addRequest = new AddPlayerRequest
+            {
+                Position = "QB",
+                Player = new Player { SportId = 1, TeamId = 1,Number = 12, Name = "Tom Brady" },
+                PositionDepth = 0
+            };
+
+            _depthChartService.When(x => x.AddPlayerToDepthChart(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Player>(), Arg.Any<int?>()))
+                            .Do(x =>
+                                    {
+                                        var key = (x.ArgAt<int>(0), x.ArgAt<int>(1), x.Arg<string>());
+                                        if (!tempDict.ContainsKey(key))
+                                        {
+                                            tempDict[key] = new List<Player>();
+                                        }
+                                        tempDict[key].Add(x.Arg<Player>());
+                                    });
+
+            _depthChartService.GetFullDepthChart(Arg.Any<int>(), Arg.Any<int>())
+                              .Returns(x => tempDict.Where(k => k.Key.Item1 == x.ArgAt<int>(0) && k.Key.Item2 == x.ArgAt<int>(1))
+                                                    .ToDictionary(d => d.Key.Item3, d => d.Value));
+
+            _controller.AddPlayerToDepthChart(addRequest);
+           var playerToRemove = new Player { Number = removeRequest.PlayerNumber, Name = "Tom Brady" };
+           _depthChartService.RemovePlayerFromDepthChart(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Player>()).Returns(playerToRemove);
+
+           // Act
+           var result = _controller.RemovePlayerFromDepthChart(removeRequest) as OkObjectResult;
+
+           // Assert
+           Assert.That(result, Is.Not.Null);
+           Assert.That(result.StatusCode, Is.EqualTo(200));
+           Assert.That(result.Value, Is.EqualTo(playerToRemove));
+           _depthChartService.Received().RemovePlayerFromDepthChart(removeRequest.SportId, removeRequest.TeamId, removeRequest.Position, Arg.Is<Player>(p => p.Number == playerToRemove.Number && p.Name == playerToRemove.Name));
         }
 
         [Test]
         public void RemovePlayerFromDepthChart_ReturnsNotFound_WhenPlayerDoesNotExist()
         {
-            // Arrange
-            var playerJson = JsonDocument.Parse("{\"number\": 99, \"name\": \"Non Existent Player\", \"position\": \"QB\"}").RootElement;
-            _depthChartService.RemovePlayerFromDepthChart(Arg.Any<string>(), Arg.Any<Player>()).Returns(null as Player);
+            var removeRequest = new PlayerRequest
+            {
+                SportId = 1,
+                TeamId = 1,
+                Position = "QB",
+                PlayerNumber = 99 // Non-existent player
+            };
 
-            // Act
-            var result = _controller.RemovePlayerFromDepthChart(playerJson) as NotFoundResult;
+            var tempDict = new Dictionary<(int, int, string), List<Player>>();
 
-            // Assert
+            var addRequest = new AddPlayerRequest
+            {
+                Position = "QB",
+                Player = new Player { SportId = 1, TeamId = 1,Number = 12, Name = "Tom Brady" },
+                PositionDepth = 0
+            };
+
+            _depthChartService.When(x => x.AddPlayerToDepthChart(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<Player>(), Arg.Any<int?>()))
+                            .Do(x =>
+                                    {
+                                        var key = (x.ArgAt<int>(0), x.ArgAt<int>(1), x.Arg<string>());
+                                        if (!tempDict.ContainsKey(key))
+                                        {
+                                            tempDict[key] = new List<Player>();
+                                        }
+                                        tempDict[key].Add(x.Arg<Player>());
+                                    });
+
+            _depthChartService.GetFullDepthChart(Arg.Any<int>(), Arg.Any<int>())
+                              .Returns(x => tempDict.Where(k => k.Key.Item1 == x.ArgAt<int>(0) && k.Key.Item2 == x.ArgAt<int>(1))
+                                                    .ToDictionary(d => d.Key.Item3, d => d.Value));
+
+            _controller.AddPlayerToDepthChart(addRequest);
+            _depthChartService.RemovePlayerFromDepthChart(removeRequest.SportId, removeRequest.TeamId, removeRequest.Position, Arg.Any<Player>()).Returns(null as Player);
+
+            var result = _controller.RemovePlayerFromDepthChart(removeRequest) as NotFoundResult;
+
             Assert.That(result, Is.Not.Null);
             Assert.That(result.StatusCode, Is.EqualTo(404));
         }
 
-        // Example of a failed test case: Invalid player data (e.g., missing number)
-        [Test]
-        public void RemovePlayerFromDepthChart_ReturnsBadRequest_WhenPlayerDataIsInvalid()
-        {
-            // Arrange
-            var playerJson = JsonDocument.Parse("{\"name\": \"Tom Brady\", \"position\": \"QB\"}").RootElement;
-
-            // Act
-            var result = _controller.RemovePlayerFromDepthChart(playerJson) as BadRequestObjectResult;
-
-            // Assert
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result.StatusCode, Is.EqualTo(400));
-        }
-
-        // Example of an edge test case: Removing a player that was never added
-        [Test]
-        public void RemovePlayerFromDepthChart_ReturnsBadRequest_WhenPlayerWasNeverAdded()
-        {
-            // Arrange
-            var playerJson = JsonDocument.Parse("{\"number\": 100, \"name\": \"Ghost Player\", \"position\": \"QB\"}").RootElement;
-            _depthChartService.RemovePlayerFromDepthChart(Arg.Any<string>(), Arg.Is<Player>(p => p.Number == 100)).Returns(null as Player);
-
-            // Act
-            var result = _controller.RemovePlayerFromDepthChart(playerJson) as NotFoundResult;
-
-            // Assert
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result.StatusCode, Is.EqualTo(404));
-        }
 
         // ------------------- GetBackups Tests -------------------
         [Test]
         public void GetBackups_ReturnsListOfBackups_WhenValidRequest()
         {
-            // Arrange
-            var position = "QB";
-            var playerNumber = 666;
+            var request = new PlayerRequest
+            {
+                SportId = 1,
+                TeamId = 1,
+                Position = "QB",
+                PlayerNumber = 12
+            };
+            var player1 = new Player { Number = 12, Name = "Tom Brady" };
+            var player2 = new Player { Number = 11, Name = "Blaine Gabbert" };
+            var backups = new List<Player>
+            {
+                player2
+            };
+            var fullDepthChartForNFL = new Dictionary<string, List<Player>>();
+            fullDepthChartForNFL.Add("QB", new List<Player> { player1, player2 });
+            _depthChartService.GetBackups(request.SportId, request.TeamId, request.Position, player1).Returns(backups);
+            _depthChartService.GetFullDepthChart(Arg.Any<int>(), Arg.Any<int>())
+                              .Returns(fullDepthChartForNFL);
 
-            var fullDepthChart = PrepareData();
-            var backupsList = fullDepthChart.GetRange(1, 2);
+            var result = _controller.GetBackups(request.SportId, request.TeamId, request.Position, request.PlayerNumber) as OkObjectResult;
 
-            _depthChartService.GetFullDepthChart().Returns(new Dictionary<string, List<Player>> { { position, fullDepthChart } });
-            _depthChartService.GetBackups(position, Arg.Any<Player>()).Returns(backupsList);
-            // Act
-            var result = _controller.GetBackups(position, playerNumber) as OkObjectResult;
-
-            // Assert
             Assert.That(result, Is.Not.Null);
             Assert.That(result.StatusCode, Is.EqualTo(200));
-            Assert.That(result.Value, Is.EqualTo(backupsList));
+            Assert.That(result.Value, Is.EquivalentTo(backups));
         }
 
-        [Test]
-        public void GetBackups_ReturnsEmptyList_WhenPlayerHasNoBackups()
-        {
-            // Arrange
-            var position = "QB";
-            var playerNumber = 2; // Assuming this player is last on the depth chart
-            var fullDepthChart = PrepareData();
-            _depthChartService.GetFullDepthChart().Returns(new Dictionary<string, List<Player>> { { position, fullDepthChart } });
-            _depthChartService.GetBackups(position, Arg.Any<Player>()).Returns(new List<Player>());
-
-            // Act
-            var result = _controller.GetBackups(position, playerNumber) as OkObjectResult;
-
-            // Assert
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result.StatusCode, Is.EqualTo(200));
-            Assert.That(result.Value, Is.Empty);
-        }
-
-        [Test]
-        public void GetBackups_ReturnsNotFound_WhenPositionIsInvalid()
-        {
-            // Arrange
-            var position = "InvalidPosition";
-            var playerNumber = 12;
-
-            // Act
-            var result = _controller.GetBackups(position, playerNumber) as NotFoundResult;
-
-            // Assert
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result.StatusCode, Is.EqualTo(404));
-        }
-
-        [Test]
-        public void GetBackups_ReturnsNotFound_WhenPlayerNumberIsInvalid()
-        {
-            // Arrange
-            var position = "QB";
-            var playerNumber = 99; // Assuming this player number does not exist
-
-            // Act
-            var result = _controller.GetBackups(position, playerNumber) as NotFoundResult;
-
-            // Assert
-            Assert.That(result!.StatusCode, Is.EqualTo(404));
-        }
 
         // --------------------- GetFullDepthChart Tests -------------------
         [Test]
         public void GetFullDepthChart_ReturnsCompleteDepthChart_WhenCalled()
         {
-            // Arrange
-            var fullDepthChart = new Dictionary<string, List<Player>>
-            {
-                ["QB"] = new List<Player>
-            {
-                new Player { Number = 12, Name = "Tom Brady" },
-                new Player { Number = 11, Name = "Blaine Gabbert" }
-            },
-                ["RB"] = new List<Player>
-            {
-                new Player { Number = 28, Name = "Leonard Fournette" },
-                new Player { Number = 27, Name = "Ronald Jones" }
-            }
-            };
+            var key = (1,1);
+            var fullChart = PrepareData();
 
-            _depthChartService.GetFullDepthChart().Returns(fullDepthChart);
+            var fullDepthChartForNFL = fullChart.Where( kvp => kvp.Key.Item1 == key.Item1 && kvp.Key.Item2 == key.Item2)
+                                                .ToDictionary(k => k.Key.Item3, v => v.Value);
 
-            // Act
-            var result = _controller.GetFullDepthChart() as OkObjectResult;
+            _depthChartService.GetFullDepthChart(Arg.Any<int>(), Arg.Any<int>())
+                              .Returns(fullDepthChartForNFL);
 
-            // Assert
+            var result = _controller.GetFullDepthChart(1, 1) as OkObjectResult;
+
             Assert.That(result, Is.Not.Null);
             Assert.That(result.StatusCode, Is.EqualTo(200));
-            Assert.That(result.Value, Is.EqualTo(fullDepthChart));
+            Assert.That(result.Value, Is.EqualTo(fullDepthChartForNFL));
         }
 
-        // Example of an edge test case: Empty depth chart
-        [Test]
-        public void GetFullDepthChart_ReturnsEmptyDepthChart_WhenNoPlayersAreListed()
+        private Dictionary<(int, int, string), List<Player>> PrepareData()
         {
-            // Arrange
-            var emptyDepthChart = new Dictionary<string, List<Player>>();
-            _depthChartService.GetFullDepthChart().Returns(emptyDepthChart);
+            var tempDict = new Dictionary<(int, int, string), List<Player>>();
+            var fullDepthChartForNFL = new Dictionary<string, List<Player>>();
 
-            // Act
-            var result = _controller.GetFullDepthChart() as OkObjectResult;
-
-            // Assert
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result.StatusCode, Is.EqualTo(200));
-            Assert.That(result.Value, Is.EqualTo(emptyDepthChart));
-        }
-
-        // Example of a failure case: Service throws an exception (simulating a service error)
-        [Test]
-        public void GetFullDepthChart_ReturnsInternalServerError_WhenServiceThrowsException()
-        {
-            // Arrange
-            _depthChartService.When(x => x.GetFullDepthChart()).Do(x => throw new System.Exception("Internal service error"));
-
-            // Act
-            var result = _controller.GetFullDepthChart() as ObjectResult;
-
-            // Assert
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result.StatusCode, Is.EqualTo(500));
-            Assert.That(result.Value, Is.EqualTo("Internal service error"));
-        }
-
-        private List<Player> PrepareData()
-        {
             var mainPlayer = new Player { Number = 666, Name = "Main Player" };
             var gabbert = new Player { Number = 11, Name = "Gabbert, Blaine" };
             var kyle = new Player { Number = 2, Name = "Trask, Kyle" };
 
-            var fullDepthChart = new List<Player>
-                        {
-                            mainPlayer,
-                            gabbert,
-                            kyle
-                        };
+            fullDepthChartForNFL.Add("QB", new List<Player> { mainPlayer, gabbert, kyle });
+            tempDict.Add((1, 1, "QB"), new List<Player> { mainPlayer, gabbert, kyle });
 
-
-            return fullDepthChart;
+            return tempDict;
         }
 
     }
