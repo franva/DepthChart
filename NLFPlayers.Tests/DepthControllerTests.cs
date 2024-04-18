@@ -22,7 +22,7 @@ namespace NLFPlayers.Tests
             _controller = new DepthChartController(_depthChartService, _cache);
         }
 
-        [OneTimeTearDown]
+        [TearDownAttribute]
         public void OneTimeTearDown()
         {
             _cache.Dispose();

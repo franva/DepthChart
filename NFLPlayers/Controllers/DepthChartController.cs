@@ -78,7 +78,7 @@ namespace NFLPlayers.Controllers
             try
             {
                 var cacheKey = $"Backups-{sportId}-{teamId}-{position}".ToLowerInvariant();
-                if(!_cache.TryGetValue(cacheKey, out List<Player> backups))
+                if(!_cache.TryGetValue(cacheKey, out List<Player>? backups))
                 {
                     var fullDepthChart = _depthChartService.GetFullDepthChart(sportId, teamId);
                     if (fullDepthChart == null || !fullDepthChart.ContainsKey(position) || fullDepthChart[position].Count == 0)
